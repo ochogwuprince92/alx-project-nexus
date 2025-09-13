@@ -79,5 +79,5 @@ This project is a real-world applicable backend system that reflects industry st
 ## Author
 **Prince Ochogwu**  
 - GitHub: [ochogwuprince92](https://github.com/ochogwuprince92)  
-- LinkedIn: [Your LinkedIn Profile](https://linkedin.com/in/your-link)  
+- LinkedIn: [Ochogwuprince](https://linkedin.com/in/your-link)  
 - Email: ochogwuprince92@gmail.com
