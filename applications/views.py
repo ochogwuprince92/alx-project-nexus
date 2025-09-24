@@ -18,14 +18,16 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
         # Send email async
         job = application.job
         subject = f"New Application for {job.title}"
-        message = f"{application.user.username} applied for {job.title}."
-        Notification.objects.create(
-            recipient=job.posted_by,
-            message=message
-        )
+        message = f"{application.user.email} applied for {job.title}."
 
-        recipient = job.company_name  # you might replace this with job.company.email
+        # Notification
+        if job.posted_by:  # safety check
+            Notification.objects.create(
+                recipient=job.posted_by,
+                message=message
+            )
 
+        recipient = job.company_name  # might replace with email
         send_application_email_task.delay(recipient, subject, message)
     
 class NotificationListView(generics.ListAPIView):
@@ -33,8 +35,11 @@ class NotificationListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Notification.objects.filter(recipient=self.request.user).order_by("-created_at")
-    
+        user = self.request.user
+        if not user.is_authenticated:
+            return Notification.objects.none()  # avoid crash
+        return Notification.objects.filter(recipient=user).order_by("-created_at")    
+
 class JobApplicationStatusUpdateView(generics.UpdateAPIView):
     queryset = JobApplication.objects.all()
     serializer_class = JobApplicationStatusUpdateSerializer
@@ -43,16 +48,17 @@ class JobApplicationStatusUpdateView(generics.UpdateAPIView):
     def perform_update(self, serializer):
         application = serializer.save()
 
-        # Send in-app notification
+        # In-app notification
         message = f"Your application for '{application.job.title}' has been {application.status}."
-        Notification.objects.create(
-            recipient=application.user,
-            message=message
-        )
+        if application.user:  # safety
+            Notification.objects.create(
+                recipient=application.user,
+                message=message
+            )
 
-        # Send async email
+        # Async email
         subject = f"Application Status Updated: {application.job.title}"
-        email_message = f"Hello {application.user.username},\n\n{message}\n\nPlease log in to view more details."
+        email_message = f"Hello {application.user.email},\n\n{message}\n\nPlease log in to view more details."
         send_application_email_task.delay(application.user.email, subject, email_message)
     
 class UserJobApplicationsListView(generics.ListAPIView):
@@ -60,14 +66,30 @@ class UserJobApplicationsListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return JobApplication.objects.filter(user=self.request.user).order_by("-applied_at")
+        user = self.request.user
+        if not user.is_authenticated:
+            return JobApplication.objects.none()
+        return JobApplication.objects.filter(user=user).order_by("-applied_at")
 
 class MarkNotificationReadView(generics.UpdateAPIView):
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        user = self.request.user
+        if not user.is_authenticated:
+            return Notification.objects.none()
+        return Notification.objects.filter(recipient=user)
+
     def patch(self, request, *args, **kwargs):
-        notification = Notification.objects.get(pk=kwargs['pk'], recipient=request.user)
+        user = request.user
+        if not user.is_authenticated:
+            return Response({"detail": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        notification = Notification.objects.filter(pk=kwargs['pk'], recipient=user).first()
+        if not notification:
+            return Response({"detail": "Notification not found"}, status=status.HTTP_404_NOT_FOUND)
+
         notification.is_read = True
         notification.save()
         return Response({"detail": "Notification marked as read"}, status=status.HTTP_200_OK)
