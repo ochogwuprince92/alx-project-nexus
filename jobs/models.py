@@ -52,7 +52,7 @@ class CompanyProfile(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="company_profile"
+        related_name="company_profile",
     )
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
@@ -79,10 +79,10 @@ class Job(models.Model):
         ("hybrid", "Hybrid"),
     )
 
-    title = models.CharField(max_length=255)
+    title = models.CharField(max_length=255, db_index=True)
     description = models.TextField()
     requirements = models.TextField(help_text="List job requirements, skills, or qualifications")
-    company_name = models.CharField(max_length=255)
+    company_name = models.CharField(max_length=255, db_index=True)
     location = models.CharField(max_length=255, blank=True, null=True)
     employment_type = models.CharField(max_length=20, choices=EMPLOYMENT_TYPES, default="full-time")
 
@@ -101,7 +101,7 @@ class Job(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="jobs"
+        related_name="jobs",
     )
     # 🔹 New fields for filtering
     category = models.ForeignKey(
@@ -109,7 +109,7 @@ class Job(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="jobs"
+        related_name="jobs",
     )
     tags = models.ManyToManyField(JobTag, blank=True, related_name="jobs")
 

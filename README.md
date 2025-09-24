@@ -1,5 +1,7 @@
 # ALX Project Nexus – Job Board Backend
 
+[![CI](https://github.com/ochogwuprince92/alx-project-nexus/actions/workflows/ci.yml/badge.svg)](https://github.com/ochogwuprince92/alx-project-nexus/actions/workflows/ci.yml)
+
 ## Repository URL
 [GitHub Repo – alx-project-nexus](https://github.com/ochogwuprince92/alx-project-nexus)
 

@@ -1,10 +1,19 @@
-
 from rest_framework import viewsets, permissions, generics, status
 from .models import JobApplication, Notification
-from .serializers import JobApplicationSerializer, NotificationSerializer, JobApplicationStatusUpdateSerializer
+from .serializers import (
+    JobApplicationSerializer,
+    NotificationSerializer,
+    JobApplicationStatusUpdateSerializer,
+)
 from .tasks import send_application_email_task
+import logging
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
+from django.conf import settings
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from drf_yasg.utils import swagger_auto_schema
+
 
 class JobApplicationViewSet(viewsets.ModelViewSet):
     queryset = JobApplication.objects.all()
@@ -12,55 +21,138 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        # Attach the logged-in user to the application
+        # Attach the logged-in user to the application and perform post-create actions
         application = serializer.save(user=self.request.user)
 
-        # Send email async
-        job = application.job
-        subject = f"New Application for {job.title}"
-        message = f"{application.user.email} applied for {job.title}."
+        # Post-create: send in-app notification and an async email to the job poster/company
+        job = getattr(application, "job", None)
+        if not job:
+            return
 
-        # Notification
-        if job.posted_by:  # safety check
-            Notification.objects.create(
-                recipient=job.posted_by,
-                message=message
+        # Build message
+        job_title = getattr(job, "title", "the job")
+        user = getattr(application, "user", None)
+        user_email = getattr(user, "email", None)
+        # Prefer email, then phone, then first_name, then fallback
+        user_display = (
+            user_email
+            or getattr(user, "phone", None)
+            or getattr(user, "first_name", None)
+            or "A user"
+        )
+        subject = f"New Application for {job_title}"
+        message = f"{user_display} applied for {job_title}."
+
+        # In-app notification to the poster, if any
+        posted_by = getattr(job, "posted_by", None)
+        if posted_by:
+            Notification.objects.create(recipient=posted_by, message=message)
+
+        # Choose an email recipient: poster's email -> job.company_email -> fallback to company_name
+        recipient = None
+        if posted_by and getattr(posted_by, "email", None):
+            recipient = posted_by.email
+        elif getattr(job, "company_email", None):
+            recipient = job.company_email
+        else:
+            recipient = getattr(job, "company_name", None)
+
+        # Fire-and-forget async email (validate recipient first; don't let failures break the request)
+        logger = logging.getLogger(__name__)
+        try:
+            # Only send if recipient is a valid email address
+            validate_email(recipient)
+            send_application_email_task.delay(recipient, subject, message)
+        except (ValidationError, TypeError):
+            # recipient isn't a valid email (could be company_name or None)
+            # If we have a company_name, send a fallback email to DEFAULT_FROM_EMAIL and include intended recipient
+            company_name = getattr(job, "company_name", None)
+            if company_name:
+                fallback = getattr(settings, "DEFAULT_FROM_EMAIL", None)
+                if fallback:
+                    fallback_message = (
+                        f"[Intended recipient: {company_name}]\n\n{message}"
+                    )
+                    try:
+                        send_application_email_task.delay(
+                            fallback, subject, fallback_message
+                        )
+                        logger.info(
+                            "Sent fallback email to %s for company %s (job=%s)",
+                            fallback,
+                            company_name,
+                            getattr(job, "id", None),
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Failed to enqueue fallback send_application_email_task for fallback=%r",
+                            fallback,
+                        )
+                else:
+                    logger.warning(
+                        "No DEFAULT_FROM_EMAIL configured; skipping email for company=%r",
+                        company_name,
+                    )
+            else:
+                logger.warning(
+                    "Skipping email send: invalid recipient=%r for job=%r",
+                    recipient,
+                    getattr(job, "id", None),
+                )
+        except Exception:
+            # If Celery task enqueue fails, we silently continue so the API response isn't affected
+            logger.exception(
+                "Failed to enqueue send_application_email_task for recipient=%r",
+                recipient,
             )
 
-        recipient = job.company_name  # might replace with email
-        send_application_email_task.delay(recipient, subject, message)
-    
+    @swagger_auto_schema(
+        operation_description="Create a new job application", security=[{"Bearer": []}]
+    )
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+
+
 class NotificationListView(generics.ListAPIView):
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        operation_description="List notifications for the authenticated user",
+        security=[{"Bearer": []}],
+    )
     def get_queryset(self):
         user = self.request.user
         if not user.is_authenticated:
             return Notification.objects.none()  # avoid crash
-        return Notification.objects.filter(recipient=user).order_by("-created_at")    
+        return Notification.objects.filter(recipient=user).order_by("-created_at")
+
 
 class JobApplicationStatusUpdateView(generics.UpdateAPIView):
     queryset = JobApplication.objects.all()
     serializer_class = JobApplicationStatusUpdateSerializer
     permission_classes = [permissions.IsAdminUser]
 
+    @swagger_auto_schema(
+        operation_description="Update job application status (admin only)",
+        security=[{"Bearer": []}],
+    )
     def perform_update(self, serializer):
         application = serializer.save()
 
         # In-app notification
         message = f"Your application for '{application.job.title}' has been {application.status}."
         if application.user:  # safety
-            Notification.objects.create(
-                recipient=application.user,
-                message=message
-            )
+            Notification.objects.create(recipient=application.user, message=message)
 
         # Async email
         subject = f"Application Status Updated: {application.job.title}"
         email_message = f"Hello {application.user.email},\n\n{message}\n\nPlease log in to view more details."
-        send_application_email_task.delay(application.user.email, subject, email_message)
-    
+        send_application_email_task.delay(
+            application.user.email, subject, email_message
+        )
+
+
 class UserJobApplicationsListView(generics.ListAPIView):
     serializer_class = JobApplicationSerializer
     permission_classes = [IsAuthenticated]
@@ -69,7 +161,12 @@ class UserJobApplicationsListView(generics.ListAPIView):
         user = self.request.user
         if not user.is_authenticated:
             return JobApplication.objects.none()
-        return JobApplication.objects.filter(user=user).order_by("-applied_at")
+        return (
+            JobApplication.objects.filter(user=self.request.user)
+            .select_related("job")
+            .order_by("-applied_at")
+        )
+
 
 class MarkNotificationReadView(generics.UpdateAPIView):
     serializer_class = NotificationSerializer
@@ -84,12 +181,21 @@ class MarkNotificationReadView(generics.UpdateAPIView):
     def patch(self, request, *args, **kwargs):
         user = request.user
         if not user.is_authenticated:
-            return Response({"detail": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response(
+                {"detail": "Authentication required"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
 
-        notification = Notification.objects.filter(pk=kwargs['pk'], recipient=user).first()
+        notification = Notification.objects.filter(
+            pk=kwargs["pk"], recipient=user
+        ).first()
         if not notification:
-            return Response({"detail": "Notification not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "Notification not found"}, status=status.HTTP_404_NOT_FOUND
+            )
 
         notification.is_read = True
         notification.save()
-        return Response({"detail": "Notification marked as read"}, status=status.HTTP_200_OK)
+        return Response(
+            {"detail": "Notification marked as read"}, status=status.HTTP_200_OK
+        )

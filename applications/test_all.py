@@ -121,7 +121,6 @@ class PostCreateEmailTests(TestCase):
         job = Job.objects.create(
             title="Dev",
             posted_by=self.poster,
-            company_email="company@example.com",
             company_name="Company",
         )
         application = JobApplication.objects.create(user=self.user, job=job)
@@ -142,6 +141,35 @@ class PostCreateEmailTests(TestCase):
 
         mocked_delay.assert_called()
 
+    @patch("applications.views.send_application_email_task.delay")
+    def test_email_not_sent_when_no_recipient(self, mocked_delay):
+        # create a poster without email by providing phone instead
+        poster_no_email = User.objects.create_user(phone="+1234567890", password="pass")
+        job = Job.objects.create(
+            title="Dev2", company_name="CompanyNoEmail", posted_by=poster_no_email
+        )
+        application = JobApplication.objects.create(user=self.user, job=job)
+
+        from applications.views import JobApplicationViewSet
+
+        viewset = JobApplicationViewSet()
+        viewset.request = type("obj", (), {"user": self.user})()
+
+        class DummySerializer:
+            def save(self, **kwargs):
+                return application
+
+        viewset.perform_create(DummySerializer())
+        # With fallback behavior we expect a fallback email to DEFAULT_FROM_EMAIL to be enqueued
+        from django.conf import settings
+
+        fallback = getattr(settings, "DEFAULT_FROM_EMAIL")
+        # ensure the celery task was enqueued
+        mocked_delay.assert_called()
+        # assert the last call used the fallback address
+        called_args = mocked_delay.call_args[0]
+        self.assertEqual(called_args[0], fallback)
+
 
 class CeleryTaskTest(TestCase):
     def test_send_application_email_task(self):
@@ -159,25 +187,3 @@ class CeleryTaskTest(TestCase):
         self.assertEqual(mail.outbox[0].subject, "Job Application")
         self.assertEqual(mail.outbox[0].to, ["test@example.com"])
         self.assertIn("Hello, test message", mail.outbox[0].body)
-
-    @patch("applications.views.send_application_email_task.delay")
-    def test_email_not_sent_when_no_recipient(self, mocked_delay):
-        # job without posted_by or company_email
-        job = Job.objects.create(title="Dev2", company_name="CompanyNoEmail")
-        application = JobApplication.objects.create(user=self.user, job=job)
-
-        from applications.views import JobApplicationViewSet
-
-        viewset = JobApplicationViewSet()
-        viewset.request = type("obj", (), {"user": self.user})()
-
-        class DummySerializer:
-            def save(self, **kwargs):
-                return application
-
-        viewset.perform_create(DummySerializer())
-
-        # If recipient is company_name (not an email), the code still calls the task; this test ensures we at least
-        # executed without error and the task was called with a non-email value. Depending on desired behavior,
-        # you may instead assert not_called and update implementation.
-        mocked_delay.assert_called()

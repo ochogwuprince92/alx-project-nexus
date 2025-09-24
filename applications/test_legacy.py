@@ -118,10 +118,10 @@ class PostCreateEmailTests(TestCase):
 
     @patch("applications.views.send_application_email_task.delay")
     def test_email_sent_when_company_email_present(self, mocked_delay):
+        # current Job model doesn't have company_email; use company_name and posted_by
         job = Job.objects.create(
             title="Dev",
             posted_by=self.poster,
-            company_email="company@example.com",
             company_name="Company",
         )
         application = JobApplication.objects.create(user=self.user, job=job)
@@ -162,14 +162,17 @@ class CeleryTaskTest(TestCase):
 
     @patch("applications.views.send_application_email_task.delay")
     def test_email_not_sent_when_no_recipient(self, mocked_delay):
-        # job without posted_by or company_email
-        job = Job.objects.create(title="Dev2", company_name="CompanyNoEmail")
-        application = JobApplication.objects.create(user=self.user, job=job)
+        # create a poster without email by providing phone instead
+        poster_no_email = User.objects.create_user(phone="+1234567890", password="pass")
+        job = Job.objects.create(title="Dev2", company_name="CompanyNoEmail", posted_by=poster_no_email)
+        # create a local applicant for this test
+        applicant = User.objects.create_user(email="localapplicant@example.com", password="pass")
+        application = JobApplication.objects.create(user=applicant, job=job)
 
         from applications.views import JobApplicationViewSet
 
         viewset = JobApplicationViewSet()
-        viewset.request = type("obj", (), {"user": self.user})()
+        viewset.request = type("obj", (), {"user": applicant})()
 
         class DummySerializer:
             def save(self, **kwargs):
