@@ -4,6 +4,8 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from .models import Job, CompanyProfile, JobCategory, JobTag
 from .serializers import JobSerializer, CompanyProfileSerializer, JobCategorySerializer, JobTagSerializer
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from django.core.cache import cache
+from django.utils.encoding import iri_to_uri
 # Jobs
 class JobViewSet(viewsets.ModelViewSet):
     queryset = Job.objects.all().select_related("category").prefetch_related("tags")
@@ -16,6 +18,24 @@ class JobViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(posted_by=self.request.user)
+
+    def list(self, request, *args, **kwargs):
+        """Cache list responses based on path and query params for a short TTL."""
+        # Build a cache key from the full path (includes querystring)
+        key = f"jobs:list:{iri_to_uri(request.get_full_path())}"
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
+
+        response = super().list(request, *args, **kwargs)
+        # Cache for 30 seconds by default
+        try:
+            cache.set(key, response, timeout=30)
+        except Exception:
+            # Silently ignore cache errors
+            pass
+
+        return response
 
 # Companies
 class CompanyProfileViewSet(viewsets.ModelViewSet):

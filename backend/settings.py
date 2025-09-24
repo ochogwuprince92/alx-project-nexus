@@ -196,3 +196,34 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "Africa/Lagos"
+
+# ---------------------
+# Caching (use local memory for tests, Redis for dev/prod)
+# ---------------------
+DEFAULT_CACHE_ALIAS = "default"
+if os.environ.get("DJANGO_TESTING") == "1":
+    CACHES = {
+        DEFAULT_CACHE_ALIAS: {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "test-cache",
+        }
+    }
+else:
+    # Use django-redis if available; fall back to simple backend if not installed
+    try:
+        CACHES = {
+            DEFAULT_CACHE_ALIAS: {
+                "BACKEND": "django_redis.cache.RedisCache",
+                "LOCATION": config("REDIS_CACHE_URL", default="redis://localhost:6379/1"),
+                "OPTIONS": {
+                    "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                },
+            }
+        }
+    except Exception:
+        CACHES = {
+            DEFAULT_CACHE_ALIAS: {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "fallback-cache",
+            }
+        }
