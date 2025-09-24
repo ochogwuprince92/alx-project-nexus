@@ -2,10 +2,17 @@ from rest_framework import viewsets, permissions, generics, filters
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from .models import Job, CompanyProfile, JobCategory, JobTag
-from .serializers import JobSerializer, CompanyProfileSerializer, JobCategorySerializer, JobTagSerializer
+from .serializers import (
+    JobSerializer,
+    CompanyProfileSerializer,
+    JobCategorySerializer,
+    JobTagSerializer,
+)
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from django.core.cache import cache
 from django.utils.encoding import iri_to_uri
+
+
 # Jobs
 class JobViewSet(viewsets.ModelViewSet):
     queryset = Job.objects.all().select_related("category").prefetch_related("tags")
@@ -18,6 +25,36 @@ class JobViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(posted_by=self.request.user)
+        # Invalidate job list cache (simple approach: clear keys with prefix)
+        try:
+            # Using cache.delete_pattern if available (django-redis); fallback to clearing entire cache
+            if hasattr(cache, "delete_pattern"):
+                cache.delete_pattern("jobs:list:*")
+            else:
+                # Best-effort: clear the whole default cache
+                cache.clear()
+        except Exception:
+            pass
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        try:
+            if hasattr(cache, "delete_pattern"):
+                cache.delete_pattern("jobs:list:*")
+            else:
+                cache.clear()
+        except Exception:
+            pass
+
+    def perform_destroy(self, instance):
+        instance.delete()
+        try:
+            if hasattr(cache, "delete_pattern"):
+                cache.delete_pattern("jobs:list:*")
+            else:
+                cache.clear()
+        except Exception:
+            pass
 
     def list(self, request, *args, **kwargs):
         """Cache list responses based on path and query params for a short TTL."""
@@ -37,6 +74,7 @@ class JobViewSet(viewsets.ModelViewSet):
 
         return response
 
+
 # Companies
 class CompanyProfileViewSet(viewsets.ModelViewSet):
     queryset = CompanyProfile.objects.all()
@@ -46,11 +84,13 @@ class CompanyProfileViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+
 # Categories
 class JobCategoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = JobCategory.objects.all()
     serializer_class = JobCategorySerializer
     permission_classes = [permissions.AllowAny]
+
 
 # Tags
 class JobTagViewSet(viewsets.ReadOnlyModelViewSet):

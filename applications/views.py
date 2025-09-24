@@ -13,12 +13,33 @@ from django.conf import settings
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from drf_yasg.utils import swagger_auto_schema
+from django.core.cache import cache
+from django.utils.encoding import iri_to_uri
 
 
 class JobApplicationViewSet(viewsets.ModelViewSet):
     queryset = JobApplication.objects.all()
     serializer_class = JobApplicationSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def list(self, request, *args, **kwargs):
+        # Cache list responses; include user id to avoid leaking others' data
+        user_part = (
+            f":user={request.user.pk}"
+            if request.user and request.user.is_authenticated
+            else ""
+        )
+        key = f"applications:list:{iri_to_uri(request.get_full_path())}{user_part}"
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
+
+        response = super().list(request, *args, **kwargs)
+        try:
+            cache.set(key, response, timeout=30)
+        except Exception:
+            pass
+        return response
 
     def perform_create(self, serializer):
         # Attach the logged-in user to the application and perform post-create actions
@@ -105,6 +126,17 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
                 "Failed to enqueue send_application_email_task for recipient=%r",
                 recipient,
             )
+        finally:
+            # Invalidate simple application-related caches
+            try:
+                if hasattr(cache, "delete_pattern"):
+                    cache.delete_pattern("applications:list:*")
+                    cache.delete_pattern("notifications:list:*")
+                    cache.delete_pattern("user_applications:list:*")
+                else:
+                    cache.clear()
+            except Exception:
+                pass
 
     @swagger_auto_schema(
         operation_description="Create a new job application", security=[{"Bearer": []}]
@@ -126,6 +158,22 @@ class NotificationListView(generics.ListAPIView):
         if not user.is_authenticated:
             return Notification.objects.none()  # avoid crash
         return Notification.objects.filter(recipient=user).order_by("-created_at")
+
+    def list(self, request, *args, **kwargs):
+        # Cache per-user notification list briefly
+        if not request.user or not request.user.is_authenticated:
+            return super().list(request, *args, **kwargs)
+        key = f"notifications:list:user={request.user.pk}:{iri_to_uri(request.get_full_path())}"
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
+
+        response = super().list(request, *args, **kwargs)
+        try:
+            cache.set(key, response, timeout=15)
+        except Exception:
+            pass
+        return response
 
 
 class JobApplicationStatusUpdateView(generics.UpdateAPIView):
@@ -151,6 +199,15 @@ class JobApplicationStatusUpdateView(generics.UpdateAPIView):
         send_application_email_task.delay(
             application.user.email, subject, email_message
         )
+        try:
+            if hasattr(cache, "delete_pattern"):
+                cache.delete_pattern("applications:list:*")
+                cache.delete_pattern("notifications:list:*")
+                cache.delete_pattern("user_applications:list:*")
+            else:
+                cache.clear()
+        except Exception:
+            pass
 
 
 class UserJobApplicationsListView(generics.ListAPIView):
@@ -166,6 +223,22 @@ class UserJobApplicationsListView(generics.ListAPIView):
             .select_related("job")
             .order_by("-applied_at")
         )
+
+    def list(self, request, *args, **kwargs):
+        # Cache per-user job applications list
+        if not request.user or not request.user.is_authenticated:
+            return super().list(request, *args, **kwargs)
+        key = f"user_applications:list:user={request.user.pk}:{iri_to_uri(request.get_full_path())}"
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
+
+        response = super().list(request, *args, **kwargs)
+        try:
+            cache.set(key, response, timeout=20)
+        except Exception:
+            pass
+        return response
 
 
 class MarkNotificationReadView(generics.UpdateAPIView):
@@ -199,3 +272,8 @@ class MarkNotificationReadView(generics.UpdateAPIView):
         return Response(
             {"detail": "Notification marked as read"}, status=status.HTTP_200_OK
         )
+
+class JobApplicationCreateView(generics.CreateAPIView):
+    queryset = JobApplication.objects.all()
+    serializer_class = JobApplicationSerializer
+    permission_classes = [IsAuthenticated]

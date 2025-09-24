@@ -103,16 +103,21 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 10,
     "DATETIME_FORMAT": "%Y-%m-%dT%H:%M:%S%z",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
-    ),
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    "EXCEPTION_HANDLER": "rest_framework.views.exception_handler",
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.AnonRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "user": "1000/day",
+        "anon": "100/day",
+    },
 }
 
 from datetime import timedelta
@@ -165,7 +170,12 @@ SPECTACULAR_SETTINGS = {
 # drf-yasg Swagger UI settings: define Bearer token security and disable session auth in UI
 SWAGGER_SETTINGS = {
     "SECURITY_DEFINITIONS": {
-        "Bearer": {"type": "apiKey", "name": "Authorization", "in": "header"}
+        "Bearer": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header",
+            "description": "JWT Authorization header using the Bearer scheme. Example: 'Bearer {your token}'",
+        }
     },
     "USE_SESSION_AUTH": False,
 }
@@ -214,7 +224,9 @@ else:
         CACHES = {
             DEFAULT_CACHE_ALIAS: {
                 "BACKEND": "django_redis.cache.RedisCache",
-                "LOCATION": config("REDIS_CACHE_URL", default="redis://localhost:6379/1"),
+                "LOCATION": config(
+                    "REDIS_CACHE_URL", default="redis://localhost:6379/1"
+                ),
                 "OPTIONS": {
                     "CLIENT_CLASS": "django_redis.client.DefaultClient",
                 },
