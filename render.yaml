@@ -1,0 +1,22 @@
+# Minimal Render service template (example). Configure via Render dashboard for actual deployment.
+services:
+  - type: web
+    name: nexus-backend
+    env: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    buildCommand: ""
+    startCommand: gunicorn backend.wsgi:application --bind 0.0.0.0:8000 --workers 3
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: backend.production_settings
+      - key: DJANGO_SECRET_KEY
+        secure: true
+      - key: POSTGRES_DB
+        value: nexus
+      - key: POSTGRES_USER
+        value: nexus
+      - key: POSTGRES_PASSWORD
+        secure: true
+      - key: CELERY_BROKER_URL
+        value: redis://redis:6379/0
