@@ -12,8 +12,12 @@ User = get_user_model()
 class PostCreateEmailTests(TestCase):
     def setUp(self):
         # custom User model uses email or phone; create users with email
-        self.user = User.objects.create_user(email="applicant@example.com", password="pass")
-        self.poster = User.objects.create_user(email="poster@example.com", password="pass")
+        self.user = User.objects.create_user(
+            email="applicant@example.com", password="pass"
+        )
+        self.poster = User.objects.create_user(
+            email="poster@example.com", password="pass"
+        )
 
     @patch("applications.views.send_application_email_task.delay")
     def test_email_sent_when_company_email_present(self, mocked_delay):
@@ -43,8 +47,12 @@ class PostCreateEmailTests(TestCase):
     @patch("applications.views.send_application_email_task.delay")
     def test_email_not_sent_when_no_recipient(self, mocked_delay):
         # job without company_email; ensure posted_by is provided (simulate no-email poster)
-        poster_no_email = User.objects.create_user(email=None, phone="+1234567890", password="pass")
-        job = Job.objects.create(title="Dev2", company_name="CompanyNoEmail", posted_by=poster_no_email)
+        poster_no_email = User.objects.create_user(
+            email=None, phone="+1234567890", password="pass"
+        )
+        job = Job.objects.create(
+            title="Dev2", company_name="CompanyNoEmail", posted_by=poster_no_email
+        )
         application = JobApplication.objects.create(user=self.user, job=job)
 
         from applications.views import JobApplicationViewSet

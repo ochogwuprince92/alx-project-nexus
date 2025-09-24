@@ -99,7 +99,7 @@ AUTH_USER_MODEL = "users.User"
 # REST Framework & JWT
 # ---------------------
 REST_FRAMEWORK = {
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "DEFAULT_PAGINATION_CLASS": "common.pagination.StandardResultsSetPagination",
     "PAGE_SIZE": 10,
     "DATETIME_FORMAT": "%Y-%m-%dT%H:%M:%S%z",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",

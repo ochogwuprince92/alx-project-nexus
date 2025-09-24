@@ -164,9 +164,13 @@ class CeleryTaskTest(TestCase):
     def test_email_not_sent_when_no_recipient(self, mocked_delay):
         # create a poster without email by providing phone instead
         poster_no_email = User.objects.create_user(phone="+1234567890", password="pass")
-        job = Job.objects.create(title="Dev2", company_name="CompanyNoEmail", posted_by=poster_no_email)
+        job = Job.objects.create(
+            title="Dev2", company_name="CompanyNoEmail", posted_by=poster_no_email
+        )
         # create a local applicant for this test
-        applicant = User.objects.create_user(email="localapplicant@example.com", password="pass")
+        applicant = User.objects.create_user(
+            email="localapplicant@example.com", password="pass"
+        )
         application = JobApplication.objects.create(user=applicant, job=job)
 
         from applications.views import JobApplicationViewSet
