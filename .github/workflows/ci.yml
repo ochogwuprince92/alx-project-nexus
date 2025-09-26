@@ -18,17 +18,15 @@ jobs:
       matrix:
         python-version: [3.12]
     env:
-      DJANGO_SETTINGS_MODULE: backend.settings
-      DJANGO_TESTING: "1"
-      EMAIL_HOST_USER: ${{ secrets.EMAIL_HOST_USER }}
-      EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
-      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      DJANGO_SETTINGS_MODULE: backend.ci_settings
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
+
       - name: Cache pip
         uses: actions/cache@v4
         with:
@@ -36,12 +34,15 @@ jobs:
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
       - name: Wait for Redis
         run: until redis-cli ping; do sleep 1; done
+
       - name: Run migrations and tests
         run: |
           python manage.py migrate --noinput
@@ -64,11 +65,7 @@ jobs:
         ports:
           - 6379:6379
     env:
-      DJANGO_SETTINGS_MODULE: backend.settings
-      DJANGO_TESTING: "0"
-      EMAIL_HOST_USER: ${{ secrets.EMAIL_HOST_USER }}
-      EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
-      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      DJANGO_SETTINGS_MODULE: backend.settings  # Use base settings, NOT production
       POSTGRES_DB: nexus
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: Ogwaa123
@@ -78,17 +75,21 @@ jobs:
       CELERY_RESULT_BACKEND: redis://127.0.0.1:6379/0
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: 3.12
+
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      - name: Run migrations and tests
+
+      - name: Run migrations and tests on Postgres
         run: |
           until pg_isready -h 127.0.0.1 -p 5432; do sleep 1; done
           python manage.py migrate --noinput
