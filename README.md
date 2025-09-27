@@ -1,6 +1,7 @@
 # ALX Project Nexus – Job Board Backend
 
 [![CI](https://github.com/ochogwuprince92/alx-project-nexus/actions/workflows/ci.yml/badge.svg)](https://github.com/ochogwuprince92/alx-project-nexus/actions/workflows/ci.yml)
+[![Docker Publish CI](https://github.com/ochogwuprince92/alx-project-nexus/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/ochogwuprince92/alx-project-nexus/actions/workflows/docker-publish.yml)
 
 ## Repository URL
 [GitHub Repo – alx-project-nexus](https://github.com/ochogwuprince92/alx-project-nexus)
@@ -50,6 +51,61 @@ The system follows **best practices** in API development, security, database opt
 
 ---
 
+## Quickstart (Local)
+
+1. Create and activate a virtual environment (optional: use the provided `yob/` venv on this repo):
+
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
+
+2. Copy environment template and set values:
+
+   ```bash
+   cp .env.example .env  # if available; otherwise create .env based on settings
+   ```
+
+   Required settings (examples):
+
+   - `DJANGO_TESTING=1` (to force SQLite during local dev)
+   - `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`
+
+3. Run migrations and start server:
+
+   ```bash
+   python manage.py migrate
+   python manage.py runserver
+   ```
+
+4. Open API docs:
+
+   - Swagger UI: `http://127.0.0.1:8000/swagger/`
+   - Redoc: `http://127.0.0.1:8000/redoc/`
+
+---
+
+## Quickstart (Docker)
+
+1. Ensure your `.env` file is present locally (not committed). The Docker build ignores `.env` via `.dockerignore`.
+
+2. Build the image:
+
+   ```bash
+   docker build -t ghcr.io/ochogwuprince92/alx-project-nexus:local .
+   ```
+
+3. Run with your `.env` file:
+
+   ```bash
+   docker run --rm -p 8000:8000 --env-file .env ghcr.io/ochogwuprince92/alx-project-nexus:local
+   ```
+
+4. Open Swagger: `http://127.0.0.1:8000/swagger/`
+
+---
+
 ## Key Features
 - **Job Posting Management**  
   - CRUD APIs for jobs and categories.  
@@ -69,22 +125,6 @@ The system follows **best practices** in API development, security, database opt
   - Celery + RabbitMQ for async processing.  
   - Email/SMS notifications after applications.  
 
-- **API Documentation**  
-  - Swagger docs hosted at:  
-    ```
-    /api/docs
-    ```
-
-- **CI/CD & Deployment**  
-  - GitHub Actions for automated tests and builds.  
-  - Docker images pushed to registry.  
-  - Kubernetes for scaling in production.  
-
----
-
-## Implementation Process
-- **Initial Setup**  
-  - `feat: set up Django project with PostgreSQL and Docker`  
 
 - **Feature Development**  
   - `feat: implement job posting and filtering APIs`  

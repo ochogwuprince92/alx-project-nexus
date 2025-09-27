@@ -1,0 +1,23 @@
+# Prevent sensitive or extraneous files from being copied into Docker images
+.env
+**/.env
+*.env
+
+# Python caches and virtualenvs
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.venv/
+yob/
+
+# VCS and CI
+.git/
+.gitignore
+.github/
+
+# OS/editor junk
+.DS_Store
+*.swp
+*.swo

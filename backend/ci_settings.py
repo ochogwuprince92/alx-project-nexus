@@ -31,3 +31,7 @@ CACHES = {
 # Celery uses Redis as usual
 CELERY_BROKER_URL = "redis://localhost:6379/0"
 CELERY_RESULT_BACKEND = "redis://localhost:6379/0"
+
+# Run Celery tasks synchronously in tests so .delay() doesn't require broker/backend
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True

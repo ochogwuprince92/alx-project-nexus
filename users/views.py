@@ -31,6 +31,12 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
 
+    @swagger_auto_schema(
+        operation_description="Register a new user with email or phone.",
+        request_body=RegisterSerializer,
+        responses={201: UserSerializer},
+        security=[],
+    )
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -98,6 +104,7 @@ class VerifyEmailView(APIView):
             400: "Token expired",
             404: "Token not found",
         },
+        security=[],
     )
     def get(self, request):
         token = request.query_params.get("token")
@@ -129,7 +136,29 @@ class LoginView(generics.GenericAPIView):
 
     @swagger_auto_schema(
         operation_description="Login and receive JWT tokens",
-        responses={200: "JWT access and refresh tokens"},
+        request_body=LoginSerializer,
+        responses={
+            200: openapi.Response(
+                description="JWT access and refresh tokens",
+                examples={
+                    "application/json": {
+                        "message": "Welcome back, Alice 🎉",
+                        "user": {
+                            "id": 1,
+                            "first_name": "Alice",
+                            "last_name": "Doe",
+                            "email": "alice@example.com",
+                            "phone": "",
+                            "role": "user",
+                            "is_verified": True,
+                            "date_joined": "2025-09-24T15:00:00Z",
+                        },
+                        "refresh": "<refresh_token>",
+                        "access": "<access_token>",
+                    }
+                },
+            )
+        },
         security=[],  # Disable auth for this endpoint
     )
     def post(self, request, *args, **kwargs):
@@ -188,6 +217,18 @@ class LogoutView(APIView):
 class ForgotPasswordView(APIView):
     """Send OTP for password reset"""
 
+    @swagger_auto_schema(
+        operation_description="Send an OTP code to the user's email for password reset.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "email": openapi.Schema(type=openapi.TYPE_STRING),
+            },
+            required=["email"],
+        ),
+        responses={200: "OTP sent"},
+        security=[],
+    )
     def post(self, request):
         email = request.data.get("email")
         user = get_object_or_404(User, email=email)
@@ -221,6 +262,20 @@ class ForgotPasswordView(APIView):
 class ResetPasswordView(APIView):
     """Reset password using OTP"""
 
+    @swagger_auto_schema(
+        operation_description="Reset password using email OTP code.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "email": openapi.Schema(type=openapi.TYPE_STRING),
+                "code": openapi.Schema(type=openapi.TYPE_STRING),
+                "password": openapi.Schema(type=openapi.TYPE_STRING),
+            },
+            required=["email", "code", "password"],
+        ),
+        responses={200: "Password reset successful"},
+        security=[],
+    )
     def post(self, request):
         email = request.data.get("email")
         code = request.data.get("code")

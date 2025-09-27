@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
+    "django_filters",
     "applications",
     "users",
     "jobs",
@@ -95,6 +96,12 @@ else:
 # ---------------------
 AUTH_USER_MODEL = "users.User"
 
+# Use custom backend that supports email or phone login, with default ModelBackend fallback
+AUTHENTICATION_BACKENDS = [
+    "users.auth_backends.PhoneOrEmailBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
+
 # ---------------------
 # REST Framework & JWT
 # ---------------------
@@ -120,8 +127,6 @@ REST_FRAMEWORK = {
     },
 }
 
-from datetime import timedelta
-
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(
         minutes=config("ACCESS_TOKEN_LIFETIME_MINUTES", default=15, cast=int)
@@ -134,14 +139,16 @@ SIMPLE_JWT = {
 }
 
 # ---------------------
-# Email (Gmail)
+# Email (SMTP)
 # ---------------------
+# Configure SMTP in base so local/dev sends real emails when credentials are supplied
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_USE_TLS = True
-EMAIL_HOST = "smtp.gmail.com"
-EMAIL_PORT = 587
-EMAIL_HOST_USER = config("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
+EMAIL_HOST = config("EMAIL_HOST", default="smtp.gmail.com")
+EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@nexusjobboard.com")
 
 # ---------------------
 # Static & Media

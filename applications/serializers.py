@@ -24,8 +24,7 @@ class JobApplicationSerializer(serializers.ModelSerializer):
         job = data.get("job")
 
         if JobApplication.objects.filter(user=user, job=job).exists():
-            raise serializers.V
-            alidationError("You have already applied to this job.")
+            raise serializers.ValidationError("You have already applied to this job.")
 
         return data
 
