@@ -6,17 +6,109 @@ services:
     plan: starter
     dockerfilePath: ./Dockerfile
     buildCommand: ""
-    startCommand: gunicorn backend.wsgi:application --bind 0.0.0.0:8000 --workers 3
+    startCommand: gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 3
+    postDeployCommand: |
+      python manage.py migrate --noinput
+      python manage.py collectstatic --noinput
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: backend.production_settings
-      - key: DJANGO_SECRET_KEY
-        secure: true
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DJANGO_ALLOWED_HOSTS
+        value: "nexus-backend.onrender.com"
       - key: POSTGRES_DB
+        sync: false
         value: nexus
       - key: POSTGRES_USER
+        sync: false
         value: nexus
       - key: POSTGRES_PASSWORD
-        secure: true
+        sync: false
+        value: ""
+      - key: POSTGRES_HOST
+        sync: false
+        value: db
+      - key: POSTGRES_PORT
+        sync: false
+        value: "5432"
       - key: CELERY_BROKER_URL
+        sync: false
         value: redis://redis:6379/0
+      - key: CELERY_RESULT_BACKEND
+        sync: false
+        value: redis://redis:6379/0
+      - key: REDIS_CACHE_URL
+        sync: false
+        value: redis://redis:6379/1
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.smtp.EmailBackend
+      - key: EMAIL_USE_TLS
+        value: "true"
+      - key: EMAIL_HOST
+        value: smtp.gmail.com
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_HOST_USER
+        sync: false
+        value: ""
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+        value: ""
+      - key: DEFAULT_FROM_EMAIL
+        value: noreply@nexusjobboard.com
+
+  - type: worker
+    name: nexus-celery-worker
+    env: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    startCommand: celery -A backend.celery worker -l info
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: backend.production_settings
+      - key: SECRET_KEY
+        fromService:
+          name: nexus-backend
+          type: web
+          envVarKey: SECRET_KEY
+      - key: POSTGRES_DB
+        fromService:
+          name: nexus-backend
+          type: web
+          envVarKey: POSTGRES_DB
+      - key: POSTGRES_USER
+        fromService:
+          name: nexus-backend
+          type: web
+          envVarKey: POSTGRES_USER
+      - key: POSTGRES_PASSWORD
+        fromService:
+          name: nexus-backend
+          type: web
+          envVarKey: POSTGRES_PASSWORD
+      - key: POSTGRES_HOST
+        fromService:
+          name: nexus-backend
+          type: web
+          envVarKey: POSTGRES_HOST
+      - key: POSTGRES_PORT
+        fromService:
+          name: nexus-backend
+          type: web
+          envVarKey: POSTGRES_PORT
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: nexus-backend
+          type: web
+          envVarKey: CELERY_BROKER_URL
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          name: nexus-backend
+          type: web
+          envVarKey: CELERY_RESULT_BACKEND
+      - key: REDIS_CACHE_URL
+        fromService:
+          name: nexus-backend
+          type: web
+          envVarKey: REDIS_CACHE_URL
