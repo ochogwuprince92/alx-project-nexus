@@ -22,9 +22,12 @@ urlpatterns = [
     path("api/users/", include("users.urls")),
     path("api/jobs/", include("jobs.urls")),
     path("api/applications/", include("applications.urls")),
-    
     # Swagger & Redoc
-    path("swagger/", schema_view.with_ui("swagger", cache_timeout=0), name="schema-swagger-ui"),
+    path(
+        "swagger/",
+        schema_view.with_ui("swagger", cache_timeout=0),
+        name="schema-swagger-ui",
+    ),
     path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
     path("openapi/", schema_view.without_ui(cache_timeout=0), name="schema-openapi"),
 ]

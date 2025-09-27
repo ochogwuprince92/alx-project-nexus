@@ -6,12 +6,18 @@ from jobs.models import Job, JobCategory
 from applications.models import JobApplication, Notification
 from applications.serializers import JobApplicationSerializer
 from rest_framework import status
+
 User = get_user_model()
+
 
 class JobApplicationModelsTest(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(email="user@example.com", password="pass1234")
-        self.user2 = User.objects.create_user(email="user2@example.com", password="pass1234")
+        self.user = User.objects.create_user(
+            email="user@example.com", password="pass1234"
+        )
+        self.user2 = User.objects.create_user(
+            email="user2@example.com", password="pass1234"
+        )
         self.category = JobCategory.objects.create(name="Engineering")
         self.job = Job.objects.create(
             title="Backend Developer",
@@ -19,7 +25,7 @@ class JobApplicationModelsTest(TestCase):
             requirements="Django",
             company_name="Test Co",
             posted_by=self.user,
-            category=self.category
+            category=self.category,
         )
 
     def test_unique_application(self):
@@ -31,7 +37,9 @@ class JobApplicationModelsTest(TestCase):
 class JobApplicationAPITest(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.user = User.objects.create_user(email="user@example.com", password="pass1234")
+        self.user = User.objects.create_user(
+            email="user@example.com", password="pass1234"
+        )
         self.client.force_authenticate(user=self.user)
         self.category = JobCategory.objects.create(name="Engineering")
         self.job = Job.objects.create(
@@ -40,7 +48,7 @@ class JobApplicationAPITest(TestCase):
             requirements="Django",
             company_name="Test Co",
             posted_by=self.user,
-            category=self.category
+            category=self.category,
         )
 
     @patch("applications.views.send_application_email_task.delay")
@@ -48,19 +56,31 @@ class JobApplicationAPITest(TestCase):
         data = {"job": self.job.id, "cover_letter": "I am interested"}
         response = self.client.post("/api/applications/", data, format="json")
         self.assertEqual(response.status_code, 201)
-        self.assertTrue(JobApplication.objects.filter(user=self.user, job=self.job).exists())
+        self.assertTrue(
+            JobApplication.objects.filter(user=self.user, job=self.job).exists()
+        )
         # Celery task called
         mock_send_email.assert_called_once()
-    
+
     def test_notifications_created(self):
-        self.client.post("/api/applications/", {"job": self.job.id, "cover_letter": "I am interested"})
-        self.assertEqual(Notification.objects.filter(recipient=self.job.posted_by).count(), 1)
+        self.client.post(
+            "/api/applications/",
+            {"job": self.job.id, "cover_letter": "I am interested"},
+        )
+        self.assertEqual(
+            Notification.objects.filter(recipient=self.job.posted_by).count(), 1
+        )
+
 
 class JobApplicationStatusUpdateTest(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.admin = User.objects.create_superuser(email="admin@example.com", password="pass1234")
-        self.user = User.objects.create_user(email="user@example.com", password="pass1234")
+        self.admin = User.objects.create_superuser(
+            email="admin@example.com", password="pass1234"
+        )
+        self.user = User.objects.create_user(
+            email="user@example.com", password="pass1234"
+        )
         self.category = JobCategory.objects.create(name="Design")
         self.job = Job.objects.create(
             title="UI/UX Designer",
@@ -68,7 +88,7 @@ class JobApplicationStatusUpdateTest(TestCase):
             requirements="Figma",
             company_name="Design Co",
             posted_by=self.admin,
-            category=self.category
+            category=self.category,
         )
         self.application = JobApplication.objects.create(user=self.user, job=self.job)
 

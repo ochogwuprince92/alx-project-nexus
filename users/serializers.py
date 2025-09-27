@@ -1,7 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from .models import User, EmailToken, EmailOTP
-from rest_framework import serializers
 
 class UserSerializer(serializers.ModelSerializer):
     date_joined = serializers.DateTimeField(read_only=True)  # returns ISO-8601 by default
@@ -19,6 +18,19 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop("password")
+        # Normalize blanks to None
+        email = validated_data.get("email") or None
+        phone = validated_data.get("phone") or None
+
+        # Enforce that at least one identifier is provided
+        if not email and not phone:
+            raise serializers.ValidationError({
+                "non_field_errors": ["Provide either an email address or a phone number."]
+            })
+
+        validated_data["email"] = email
+        validated_data["phone"] = phone
+
         user = User.objects.create_user(**validated_data)
         user.set_password(password)
         user.is_active = True

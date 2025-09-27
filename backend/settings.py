@@ -11,7 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ---------------------
 # Secret & Debug
 # ---------------------
-SECRET_KEY = config("DJANGO_SECRET_KEY")
+SECRET_KEY = config("DJANGO_SECRET_KEY", default="test-secret")
 DEBUG = config("DJANGO_DEBUG", default=False, cast=bool)
 ALLOWED_HOSTS = config("DJANGO_ALLOWED_HOSTS", default="*", cast=Csv())
 
@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
+    "django_filters",
     "applications",
     "users",
     "jobs",
@@ -54,8 +55,8 @@ MIDDLEWARE = [
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"], 
-        "APP_DIRS": True, 
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.debug",
@@ -70,59 +71,84 @@ TEMPLATES = [
 # ---------------------
 # Database (PostgreSQL)
 # ---------------------
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": config("POSTGRES_DB"),
-        "USER": config("POSTGRES_USER"),
-        "PASSWORD": config("POSTGRES_PASSWORD"),
-        "HOST": config("POSTGRES_HOST"),
-        "PORT": config("POSTGRES_PORT", cast=int),
+if os.environ.get("DJANGO_TESTING") == "1":
+    # Use a lightweight sqlite DB for local test runs
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "test_db.sqlite3",
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": config("POSTGRES_DB"),
+            "USER": config("POSTGRES_USER"),
+            "PASSWORD": config("POSTGRES_PASSWORD"),
+            "HOST": config("POSTGRES_HOST"),
+            "PORT": config("POSTGRES_PORT", cast=int),
+        }
+    }
 
 # ---------------------
 # Authentication
 # ---------------------
 AUTH_USER_MODEL = "users.User"
 
+# Use custom backend that supports email or phone login, with default ModelBackend fallback
+AUTHENTICATION_BACKENDS = [
+    "users.auth_backends.PhoneOrEmailBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
+
 # ---------------------
 # REST Framework & JWT
 # ---------------------
 REST_FRAMEWORK = {
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-    "PAGE_SIZE": 10, 
-    'DATETIME_FORMAT': "%Y-%m-%dT%H:%M:%S%z",  
+    "DEFAULT_PAGINATION_CLASS": "common.pagination.StandardResultsSetPagination",
+    "PAGE_SIZE": 10,
+    "DATETIME_FORMAT": "%Y-%m-%dT%H:%M:%S%z",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
-    ),
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.SessionAuthentication",
-        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    "EXCEPTION_HANDLER": "rest_framework.views.exception_handler",
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.AnonRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "user": "1000/day",
+        "anon": "100/day",
+    },
 }
 
-from datetime import timedelta
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=config("ACCESS_TOKEN_LIFETIME_MINUTES", cast=int)),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=config("REFRESH_TOKEN_LIFETIME_DAYS", cast=int)),
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        minutes=config("ACCESS_TOKEN_LIFETIME_MINUTES", default=15, cast=int)
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(
+        days=config("REFRESH_TOKEN_LIFETIME_DAYS", default=1, cast=int)
+    ),
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": True,
 }
 
 # ---------------------
-# Email (Gmail)
+# Email (SMTP)
 # ---------------------
+# Configure SMTP in base so local/dev sends real emails when credentials are supplied
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_USE_TLS = True
-EMAIL_HOST = "smtp.gmail.com"
-EMAIL_PORT = 587
-EMAIL_HOST_USER = config("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
+EMAIL_HOST = config("EMAIL_HOST", default="smtp.gmail.com")
+EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@nexusjobboard.com")
 
 # ---------------------
 # Static & Media
@@ -148,20 +174,38 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
 }
 
+# drf-yasg Swagger UI settings: define Bearer token security and disable session auth in UI
+SWAGGER_SETTINGS = {
+    "SECURITY_DEFINITIONS": {
+        "Bearer": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header",
+            "description": "JWT Authorization header using the Bearer scheme. Example: 'Bearer {your token}'",
+        }
+    },
+    "USE_SESSION_AUTH": False,
+}
+
+# Silence drf-yasg compatibility warning about renderers
+SWAGGER_USE_COMPAT_RENDERERS = False
+
 # Email config (for dev use console backend)
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = "noreply@nexusjobboard.com"
 
-REST_FRAMEWORK.update({
-    "DEFAULT_THROTTLE_CLASSES": [
-        "rest_framework.throttling.UserRateThrottle",
-        "rest_framework.throttling.AnonRateThrottle",
-    ],
-    "DEFAULT_THROTTLE_RATES": {
-        "user": "1000/day",   # logged-in users
-        "anon": "100/day",    # anonymous users
+REST_FRAMEWORK.update(
+    {
+        "DEFAULT_THROTTLE_CLASSES": [
+            "rest_framework.throttling.UserRateThrottle",
+            "rest_framework.throttling.AnonRateThrottle",
+        ],
+        "DEFAULT_THROTTLE_RATES": {
+            "user": "1000/day",  # logged-in users
+            "anon": "100/day",  # anonymous users
+        },
     }
-})
+)
 
 CELERY_BROKER_URL = "redis://localhost:6379/0"
 CELERY_RESULT_BACKEND = "redis://localhost:6379/0"
@@ -169,3 +213,36 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "Africa/Lagos"
+
+# ---------------------
+# Caching (use local memory for tests, Redis for dev/prod)
+# ---------------------
+DEFAULT_CACHE_ALIAS = "default"
+if os.environ.get("DJANGO_TESTING") == "1":
+    CACHES = {
+        DEFAULT_CACHE_ALIAS: {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "test-cache",
+        }
+    }
+else:
+    # Use django-redis if available; fall back to simple backend if not installed
+    try:
+        CACHES = {
+            DEFAULT_CACHE_ALIAS: {
+                "BACKEND": "django_redis.cache.RedisCache",
+                "LOCATION": config(
+                    "REDIS_CACHE_URL", default="redis://localhost:6379/1"
+                ),
+                "OPTIONS": {
+                    "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                },
+            }
+        }
+    except Exception:
+        CACHES = {
+            DEFAULT_CACHE_ALIAS: {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "fallback-cache",
+            }
+        }
