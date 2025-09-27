@@ -1,3 +1,6 @@
+import os
+# Signal to base settings to use SQLite/testing paths before import-time evaluation
+os.environ.setdefault("DJANGO_TESTING", "1")
 from .settings import *
 
 # -----------------------
