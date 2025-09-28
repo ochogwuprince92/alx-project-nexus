@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nexus Job Board API</title>
+  <link rel="icon" href="/static/favicon.ico" />
+  <style>
+    :root { --bg:#0f172a; --card:#111827; --text:#e5e7eb; --muted:#94a3b8; --accent:#22d3ee; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'; background: radial-gradient(1200px 800px at 10% 10%, #0b1220, var(--bg)), var(--bg); color: var(--text); }
+    .container { max-width: 960px; margin: 0 auto; padding: 48px 20px 80px; }
+    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+    .brand { font-size: 20px; letter-spacing: .5px; color: var(--muted); }
+    .pill { display:inline-block; border: 1px solid #223; color: var(--muted); padding: 6px 10px; border-radius: 999px; font-size: 12px; }
+    .hero { background: linear-gradient(135deg, rgba(34,211,238,0.08), rgba(168,85,247,0.08)); border:1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 36px; box-shadow: 0 10px 30px rgba(0,0,0,.25) inset; }
+    h1 { font-size: 36px; line-height: 1.2; margin: 0 0 12px; }
+    .lead { color: var(--muted); margin: 0 0 24px; }
+    .grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:16px; margin-top: 24px; }
+    .card { background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; height: 100%; }
+    .card h3 { margin: 0 0 6px; font-size: 16px; }
+    .card p { margin: 0; color: var(--muted); font-size: 14px; }
+    .actions { margin-top: 24px; display:flex; gap:12px; flex-wrap: wrap; }
+    .btn { background: rgba(34,211,238,0.12); color: var(--text); border:1px solid rgba(34,211,238,0.35); padding: 10px 14px; border-radius: 10px; text-decoration: none; transition: transform .15s ease, background .15s ease; }
+    .btn:hover { transform: translateY(-1px); background: rgba(34,211,238,0.18); }
+    footer { margin-top: 40px; color: var(--muted); font-size: 12px; text-align: center; }
+    @media (max-width: 720px){ .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">Nexus • Job Platform API</div>
+      <span class="pill">Deployed on Render</span>
+    </header>
+
+    <section class="hero">
+      <h1>Connect Talent with Opportunity</h1>
+      <p class="lead">Nexus is a modern job platform API built with Django & DRF. Explore endpoints, post roles, and apply—securely and at scale.</p>
+      <div class="actions">
+        <a class="btn" href="/swagger/">Open Swagger Docs</a>
+        <a class="btn" href="/redoc/">Open Redoc</a>
+        <a class="btn" href="/admin/">Admin Portal</a>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h3>Simple Auth</h3>
+          <p>Register, login, and authorize with JWT. Use email or phone—your choice.</p>
+        </div>
+        <div class="card">
+          <h3>Jobs & Applications</h3>
+          <p>Create jobs, browse categories & tags, and submit applications with ease.</p>
+        </div>
+        <div class="card">
+          <h3>Production Ready</h3>
+          <p>Dockerized, documented, and tuned for cloud—clean envs, caching, and logs.</p>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <p>© {{ year|default:2025 }} Nexus. Built with Django, DRF, and love.</p>
+    </footer>
+  </div>
+</body>
+</html>
