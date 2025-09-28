@@ -1,6 +1,7 @@
 from .settings import *  # noqa: F401,F403
 import os
 from decouple import config, Csv
+import dj_database_url
 
 # ---------------------
 # Production overrides
@@ -20,17 +21,26 @@ else:
     # ALLOWED_HOSTS should be explicitly provided
     ALLOWED_HOSTS = config("DJANGO_ALLOWED_HOSTS", default="", cast=Csv())
 
-    # PostgreSQL Database
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": config("POSTGRES_DB"),
-            "USER": config("POSTGRES_USER"),
-            "PASSWORD": config("POSTGRES_PASSWORD"),
-            "HOST": config("POSTGRES_HOST"),
-            "PORT": config("POSTGRES_PORT", cast=int),
+    # Prefer DATABASE_URL if provided by the platform (Render blueprint databases)
+    db_url = os.environ.get("DATABASE_URL")
+    if db_url:
+        DATABASES = {
+            "default": dj_database_url.parse(db_url, conn_max_age=600, ssl_require=False)
         }
-    }
+    else:
+        # PostgreSQL via individual env vars
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.postgresql",
+                "NAME": config("POSTGRES_DB"),
+                "USER": config("POSTGRES_USER"),
+                "PASSWORD": config("POSTGRES_PASSWORD"),
+                "HOST": config("POSTGRES_HOST"),
+                "PORT": config("POSTGRES_PORT", cast=int),
+            }
+        }
+
+    
 
     # Email
     EMAIL_BACKEND = config(

@@ -3,9 +3,8 @@ services:
   - type: web
     name: nexus-backend
     env: docker
-    plan: starter
+    plan: free
     dockerfilePath: ./Dockerfile
-    buildCommand: ""
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: backend.production_settings
@@ -13,27 +12,15 @@ services:
         generateValue: true
       - key: DJANGO_ALLOWED_HOSTS
         value: "nexus-backend.onrender.com"
-      - key: POSTGRES_DB
-        value: nexus
-      - key: POSTGRES_USER
-        value: nexus
-      - key: POSTGRES_PASSWORD
-        value: ""
-      - key: POSTGRES_HOST
-        value: db
-      - key: POSTGRES_PORT
-        value: "5432"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nexus-db
+          property: connectionString
       - key: EMAIL_BACKEND
-        value: django.core.mail.backends.smtp.EmailBackend
-      - key: EMAIL_USE_TLS
-        value: "true"
-      - key: EMAIL_HOST
-        value: smtp.gmail.com
-      - key: EMAIL_PORT
-        value: "587"
-      - key: EMAIL_HOST_USER
-        value: ""
-      - key: EMAIL_HOST_PASSWORD
-        value: ""
-      - key: DEFAULT_FROM_EMAIL
-        value: noreply@nexusjobboard.com
+        value: django.core.mail.backends.console.EmailBackend
+
+databases:
+  - name: nexus-db
+    databaseName: nexus
+    user: nexus
+    plan: free
