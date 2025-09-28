@@ -13,6 +13,9 @@ import dj_database_url
 DEBUG = False
 
 # Never run tests in production accidentally
+# Reset the testing flag so production settings apply below
+os.environ["DJANGO_TESTING"] = "0"
+
 if os.environ.get("DJANGO_TESTING") == "1":
     # Instead of raising an error, just switch to test DB and console email
     from backend.ci_settings import *
