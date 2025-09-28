@@ -89,8 +89,11 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
         try:
             # Only send if recipient is a valid email address
             validate_email(recipient)
-            # Always use delay; in CI tests CELERY_TASK_ALWAYS_EAGER runs tasks inline
-            send_application_email_task.delay(recipient, subject, message)
+            # Use Celery if broker is available; otherwise call synchronously in eager mode
+            if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
+                send_application_email_task(recipient, subject, message)
+            else:
+                send_application_email_task.delay(recipient, subject, message)
         except (ValidationError, TypeError):
             # recipient isn't a valid email (could be company_name or None)
             # If we have a company_name, send a fallback email to DEFAULT_FROM_EMAIL and include intended recipient
@@ -102,10 +105,12 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
                         f"[Intended recipient: {company_name}]\n\n{message}"
                     )
                     try:
-                        # Always use delay; eager mode will execute inline during CI
-                        send_application_email_task.delay(
-                            fallback, subject, fallback_message
-                        )
+                        if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
+                            send_application_email_task(fallback, subject, fallback_message)
+                        else:
+                            send_application_email_task.delay(
+                                fallback, subject, fallback_message
+                            )
                         logger.info(
                             "Sent fallback email to %s for company %s (job=%s)",
                             fallback,
@@ -214,8 +219,11 @@ class JobApplicationStatusUpdateView(generics.UpdateAPIView):
                 except Exception:
                     pass
             else:
-                # Use Celery in non-test environments
-                send_application_email_task.delay(to_email, subject, email_message)
+                # Use Celery in non-test environments; if eager, call synchronously
+                if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
+                    send_application_email_task(to_email, subject, email_message)
+                else:
+                    send_application_email_task.delay(to_email, subject, email_message)
 
         # Invalidate related caches
         try:
