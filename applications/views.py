@@ -199,7 +199,15 @@ class JobApplicationStatusUpdateView(generics.UpdateAPIView):
     permission_classes = [IsAuthenticated, IsJobPosterOrAdmin]
 
     def get_queryset(self):
+        # When generating Swagger schema, avoid evaluating real querysets
+        if getattr(self, "swagger_fake_view", False):
+            return JobApplication.objects.none()
+
         user = self.request.user
+        # If unauthenticated, return empty queryset to prevent AnonymousUser filter errors
+        if not getattr(user, "is_authenticated", False):
+            return JobApplication.objects.none()
+
         qs = JobApplication.objects.all()
         # Non-admins can only access applications for jobs they posted
         if not (getattr(user, "is_staff", False) or getattr(user, "is_superuser", False)):
