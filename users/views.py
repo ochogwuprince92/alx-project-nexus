@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.core.mail import send_mail
 from django.conf import settings
+from django.urls import reverse
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework import permissions
@@ -45,8 +46,10 @@ class RegisterView(generics.CreateAPIView):
         # create token for signup verification
         token_obj = EmailToken.create_for_user(user, purpose=EmailToken.PURPOSE_SIGNUP)
 
-        verification_link = (
-            f"http://localhost:8000/api/users/verify/?token={token_obj.token}"
+        # Build absolute verification URL using the current request host
+        verify_path = reverse("verify-email")
+        verification_link = request.build_absolute_uri(
+            f"{verify_path}?token={token_obj.token}"
         )
         send_mail(
             subject="Verify Your Email",
