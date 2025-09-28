@@ -90,6 +90,13 @@ class Job(models.Model):
     salary_max = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     salary_currency = models.CharField(max_length=10, default="USD")
 
+    STATUS_CHOICES = (
+        ("open", "Open"),
+        ("closed", "Closed"),
+        ("draft", "Draft"),
+    )
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="open")
+
     posted_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -117,8 +124,21 @@ class Job(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     deadline = models.DateTimeField(null=True, blank=True)
 
+    def save(self, *args, **kwargs):
+        # If a company profile is set but company_name is empty, sync the display name
+        if getattr(self, "company", None) and not self.company_name:
+            try:
+                self.company_name = self.company.name
+            except Exception:
+                pass
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.title} at {self.company_name}"
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["title"]),
+            models.Index(fields=["location"]),
+        ]

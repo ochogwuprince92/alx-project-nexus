@@ -47,7 +47,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     REQUIRED_FIELDS = []
 
     def __str__(self):
-        return self.email or self.phone
+        return self.email or self.phone or f"user-{self.pk}"
+
+    def get_full_name(self):
+        full = f"{self.first_name or ''} {self.last_name or ''}".strip()
+        return full or (self.email or self.phone or "")
     
 # EmailToken for Signup Verification
 class EmailToken(models.Model):
@@ -95,6 +99,9 @@ class EmailOTP(models.Model):
         indexes = [
             models.Index(fields=["user", "purpose", "code"]),
             models.Index(fields=["expires_at"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "purpose", "code"], name="unique_user_purpose_code")
         ]
 
     def __str__(self):
