@@ -70,15 +70,23 @@ else:
         "CELERY_RESULT_BACKEND", default="redis://localhost:6379/0"
     )
 
-    # Redis cache
-    REDIS_CACHE_URL = config("REDIS_CACHE_URL", default="redis://localhost:6379/1")
-    CACHES = {
-        "default": {
-            "BACKEND": "django_redis.cache.RedisCache",
-            "LOCATION": REDIS_CACHE_URL,
-            "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+    # Cache: use Redis only if REDIS_CACHE_URL is provided, else LocMem for free tier
+    REDIS_CACHE_URL = config("REDIS_CACHE_URL", default="")
+    if REDIS_CACHE_URL:
+        CACHES = {
+            "default": {
+                "BACKEND": "django_redis.cache.RedisCache",
+                "LOCATION": REDIS_CACHE_URL,
+                "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+            }
         }
-    }
+    else:
+        CACHES = {
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "prod-freetier-cache",
+            }
+        }
 
 # Security headers
 SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", default=True, cast=bool)
