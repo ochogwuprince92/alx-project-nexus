@@ -23,12 +23,6 @@ services:
         value: db
       - key: POSTGRES_PORT
         value: "5432"
-      - key: CELERY_BROKER_URL
-        value: redis://redis:6379/0
-      - key: CELERY_RESULT_BACKEND
-        value: redis://redis:6379/0
-      - key: REDIS_CACHE_URL
-        value: redis://redis:6379/1
       - key: EMAIL_BACKEND
         value: django.core.mail.backends.smtp.EmailBackend
       - key: EMAIL_USE_TLS
