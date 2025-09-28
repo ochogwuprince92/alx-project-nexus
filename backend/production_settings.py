@@ -1,5 +1,9 @@
-from .settings import *  # noqa: F401,F403
 import os
+# Prevent base settings from requiring POSTGRES_* at import time
+# by forcing the sqlite branch; we'll override DATABASES below.
+os.environ.setdefault("DJANGO_TESTING", "1")
+
+from .settings import *  # noqa: F401,F403
 from decouple import config, Csv
 import dj_database_url
 
