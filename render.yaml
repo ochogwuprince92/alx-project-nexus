@@ -6,10 +6,7 @@ services:
     plan: starter
     dockerfilePath: ./Dockerfile
     buildCommand: ""
-    startCommand: gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 3
-    postDeployCommand: |
-      python manage.py migrate --noinput
-      python manage.py collectstatic --noinput
+    startCommand: bash scripts/start.sh
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: backend.production_settings

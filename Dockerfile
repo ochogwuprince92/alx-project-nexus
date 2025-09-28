@@ -15,4 +15,8 @@ COPY . /app/
 
 ENV DJANGO_SETTINGS_MODULE=backend.production_settings
 
-CMD ["gunicorn", "backend.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+# Ensure scripts are executable
+RUN chmod +x scripts/start.sh
+
+# Use unified startup that runs migrations and collectstatic before Gunicorn
+CMD ["bash", "scripts/start.sh"]
