@@ -12,17 +12,20 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.conf import settings
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser
 import os
 from rest_framework.response import Response
 from drf_yasg.utils import swagger_auto_schema
 from django.core.cache import cache
 from django.utils.encoding import iri_to_uri
+from .permissions import IsJobPosterOrAdmin
 
 
 class JobApplicationViewSet(viewsets.ModelViewSet):
     queryset = JobApplication.objects.all()
     serializer_class = JobApplicationSerializer
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
 
     @swagger_auto_schema(
         operation_description="List job applications for the current filter/view.",
@@ -193,10 +196,18 @@ class NotificationListView(generics.ListAPIView):
 class JobApplicationStatusUpdateView(generics.UpdateAPIView):
     queryset = JobApplication.objects.all()
     serializer_class = JobApplicationStatusUpdateSerializer
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsAuthenticated, IsJobPosterOrAdmin]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = JobApplication.objects.all()
+        # Non-admins can only access applications for jobs they posted
+        if not (getattr(user, "is_staff", False) or getattr(user, "is_superuser", False)):
+            qs = qs.filter(job__posted_by=user)
+        return qs
 
     @swagger_auto_schema(
-        operation_description="Update job application status (admin only)",
+        operation_description="Update job application status (job poster or admin)",
         security=[{"Bearer": []}],
     )
     def perform_update(self, serializer):

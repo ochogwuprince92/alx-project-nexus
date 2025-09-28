@@ -19,12 +19,21 @@ class JobApplicationSerializer(serializers.ModelSerializer):
             "applied_at"
         ]
         read_only_fields = ["status", "applied_at", "user", "user_email", "job_title"]
+        extra_kwargs = {
+            "resume": {"required": True, "allow_null": False},
+            "cover_letter": {"required": False, "allow_null": True},
+        }
     def validate(self, data):
         user = self.context["request"].user
         job = data.get("job")
 
         if JobApplication.objects.filter(user=user, job=job).exists():
             raise serializers.ValidationError("You have already applied to this job.")
+
+        # Enforce resume is provided on creation
+        # (Model allows null/blank but product requirement is to require resume upload)
+        if self.instance is None and not data.get("resume"):
+            raise serializers.ValidationError({"resume": "Resume (PDF) is required."})
 
         return data
 
