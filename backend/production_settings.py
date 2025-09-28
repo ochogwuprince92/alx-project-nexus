@@ -64,11 +64,19 @@ else:
     else:
         EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
-    # Celery
-    CELERY_BROKER_URL = config("CELERY_BROKER_URL", default="redis://localhost:6379/0")
-    CELERY_RESULT_BACKEND = config(
-        "CELERY_RESULT_BACKEND", default="redis://localhost:6379/0"
-    )
+    # Celery: if no broker configured, run tasks eagerly (synchronously)
+    _broker = config("CELERY_BROKER_URL", default="")
+    if _broker:
+        CELERY_BROKER_URL = _broker
+        CELERY_RESULT_BACKEND = config(
+            "CELERY_RESULT_BACKEND", default=_broker
+        )
+        CELERY_TASK_ALWAYS_EAGER = False
+    else:
+        CELERY_BROKER_URL = None
+        CELERY_RESULT_BACKEND = None
+        CELERY_TASK_ALWAYS_EAGER = True
+        CELERY_TASK_EAGER_PROPAGATES = True
 
     # Cache: use Redis only if REDIS_CACHE_URL is provided, else LocMem for free tier
     REDIS_CACHE_URL = config("REDIS_CACHE_URL", default="")
